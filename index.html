@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Arcade Car Racing Game - Dodge enemy cars, survive the highway, and beat your high score!">
+  <title>🚗 Car Racing Game</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="game-header">
+      <div class="title-bar">
+        <h1 class="game-title"><span class="car-icon" aria-hidden="true">🚗</span> CAR RACING GAME</h1>
+        <div class="header-actions">
+          <button id="btn-qr" class="btn-icon" aria-label="Scan QR Code to Play on Mobile" title="Scan QR Code">
+            <span>📱</span>
+          </button>
+          <button id="btn-sound" class="btn-icon" aria-label="Toggle Sound" title="Toggle Sound">
+            <span id="sound-icon">🔊</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Heads-Up Display (HUD) -->
+      <section class="hud-panel" aria-label="Game HUD">
+        <div class="hud-item">
+          <span class="hud-label">Score</span>
+          <span id="score" class="hud-value score-pulse">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">High Score</span>
+          <span id="high-score" class="hud-value">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Speed</span>
+          <span id="speed" class="hud-value speed-tag">1x</span>
+        </div>
+      </section>
+
+      <!-- Control Toolbar -->
+      <nav class="controls-toolbar" aria-label="Game Actions">
+        <button id="btn-start" class="btn btn-primary" aria-label="Start Game">START GAME</button>
+        <button id="btn-pause" class="btn btn-secondary" aria-label="Pause or Resume Game" disabled>PAUSE</button>
+        <button id="btn-restart" class="btn btn-tertiary" aria-label="Restart Game">RESTART</button>
+      </nav>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="game-main">
+      <div id="game-container" class="game-container">
+        <!-- Racing Road -->
+        <div id="road" class="racing-road">
+          <!-- Road Curbs (Borders) -->
+          <div class="road-border road-border-left" aria-hidden="true"></div>
+          <div class="road-border road-border-right" aria-hidden="true"></div>
+
+          <!-- Moving Lane Lines -->
+          <div id="lane-lines-container" class="lane-lines-container" aria-hidden="true">
+            <!-- 2 dividers for 3 lanes -->
+            <div class="lane-divider lane-divider-1"></div>
+            <div class="lane-divider lane-divider-2"></div>
+          </div>
+
+          <!-- Dynamic Enemy Cars Container -->
+          <div id="enemy-container" class="enemy-container" aria-label="Enemy vehicles"></div>
+
+          <!-- Player Car -->
+          <div id="player-car" class="player-car" aria-label="Player Car" role="img">
+            <div class="car-shadow" aria-hidden="true"></div>
+            <div class="car-body player-body" aria-hidden="true">
+              <!-- Headlight beams projecting forward -->
+              <div class="headlight-beam beam-left"></div>
+              <div class="headlight-beam beam-right"></div>
+              <div class="car-lights front-lights">
+                <span class="light headlight"></span>
+                <span class="light headlight"></span>
+              </div>
+              <div class="car-windshield front-windshield"></div>
+              <div class="car-roof">
+                <div class="roof-stripe"></div>
+              </div>
+              <div class="car-windshield rear-windshield"></div>
+              <div class="car-lights rear-lights">
+                <span class="light taillight"></span>
+                <span class="light taillight"></span>
+              </div>
+              <div class="car-spoiler"></div>
+              <div class="car-wheels">
+                <span class="wheel wheel-fl"></span>
+                <span class="wheel wheel-fr"></span>
+                <span class="wheel wheel-rl"></span>
+                <span class="wheel wheel-rr"></span>
+              </div>
+              <!-- Nitro Exhaust Flames -->
+              <div class="exhaust-flames" aria-hidden="true">
+                <span class="flame flame-left"></span>
+                <span class="flame flame-right"></span>
+              </div>
+            </div>
+            <!-- Asset image fallback / enhancement -->
+            <img src="assets/player-car.png" alt="" class="car-asset-img" onerror="this.style.display='none'">
+          </div>
+
+          <!-- Start Screen Overlay -->
+          <section id="start-screen" class="game-overlay active" aria-label="Start Screen">
+            <div class="overlay-card glass-panel">
+              <div class="overlay-icon" aria-hidden="true">🏎️</div>
+              <h2 class="overlay-title">CAR RACING GAME</h2>
+              <div class="overlay-rules">
+                <p>⚡ Avoid enemy cars on the highway.</p>
+                <p>⏱️ Survive as long as possible.</p>
+                <p>🏆 Pass cars to score +10 & beat your high score!</p>
+              </div>
+              <div class="overlay-controls-guide">
+                <div class="guide-item">
+                  <span class="key-tag">←</span> <span class="key-tag">→</span> or <span class="key-tag">A</span> <span class="key-tag">D</span>
+                  <span class="guide-text">Steer Car</span>
+                </div>
+                <div class="guide-item">
+                  <span class="key-tag">↑</span> / <span class="key-tag">W</span> / <span class="key-tag">Space</span>
+                  <span class="guide-text">⚡ NITRO BOOST</span>
+                </div>
+                <div class="guide-item">
+                  <span class="key-tag">P</span>
+                  <span class="guide-text">Pause / Resume</span>
+                </div>
+              </div>
+              <button id="start-screen-btn" class="btn btn-primary btn-large" aria-label="Start Game">START GAME</button>
+              <button id="start-qr-btn" class="btn btn-secondary btn-qr-link" aria-label="Open QR Code Scanner">📱 Scan QR to Play on Phone</button>
+            </div>
+          </section>
+
+          <!-- Pause Screen Overlay -->
+          <section id="pause-screen" class="game-overlay" aria-label="Pause Screen">
+            <div class="overlay-card glass-panel">
+              <div class="overlay-icon" aria-hidden="true">⏸️</div>
+              <h2 class="overlay-title">GAME PAUSED</h2>
+              <p class="overlay-subtitle">Take a breather, driver!</p>
+              <button id="pause-resume-btn" class="btn btn-primary btn-large" aria-label="Resume Game">RESUME</button>
+            </div>
+          </section>
+
+          <!-- Game Over Screen Overlay -->
+          <section id="game-over-screen" class="game-overlay" aria-label="Game Over Screen">
+            <div class="overlay-card glass-panel crash-card">
+              <div class="overlay-icon crash-icon" aria-hidden="true">💥</div>
+              <h2 class="overlay-title text-danger">GAME OVER</h2>
+              <div class="game-over-stats">
+                <div class="stat-box">
+                  <span class="stat-label">Final Score</span>
+                  <span id="final-score" class="stat-value">0</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">High Score</span>
+                  <span id="final-high-score" class="stat-value">0</span>
+                </div>
+              </div>
+              <div id="new-record-badge" class="new-record-badge" style="display: none;">
+                🌟 NEW HIGH SCORE! 🌟
+              </div>
+              <div id="api-sync-status" class="api-sync-badge">
+                ☁️ Cloud API Connected
+              </div>
+              <button id="game-over-restart-btn" class="btn btn-primary btn-large" aria-label="Play Again">PLAY AGAIN</button>
+            </div>
+          </section>
+
+          <!-- QR Code Scanner Modal -->
+          <section id="qr-modal" class="game-overlay" aria-label="QR Code Game Scanner">
+            <div class="overlay-card glass-panel qr-card">
+              <button id="qr-close-btn" class="modal-close-btn" aria-label="Close QR Modal">✕</button>
+              <div class="overlay-icon" aria-hidden="true">📱</div>
+              <h2 class="overlay-title">SCAN TO PLAY</h2>
+              <p class="overlay-subtitle">Scan with your phone camera to play on mobile!</p>
+
+              <!-- QR Code Display (auto-generated from current URL) -->
+              <div class="qr-code-wrapper">
+                <img id="qr-image" src="" alt="Game QR Code" class="qr-image">
+                <div id="qr-loading" class="qr-loading">Generating QR Code...</div>
+              </div>
+
+              <!-- URL Input & Copy -->
+              <div class="qr-url-box">
+                <input type="text" id="qr-url-input" class="qr-url-input" readonly placeholder="Loading URL...">
+                <button id="btn-copy-url" class="btn btn-secondary btn-copy" type="button">📋 Copy</button>
+              </div>
+              <p id="copy-feedback" class="copy-feedback"></p>
+              <p class="qr-hint">💡 Open this game on your Wi-Fi network or use a tunnel for internet access.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Mobile Touch Controls -->
+      <section id="mobile-controls" class="mobile-controls" aria-label="Mobile Steering Controls">
+        <button id="btn-mobile-left" class="btn-mobile" aria-label="Steer Left">
+          <span class="mobile-arrow" aria-hidden="true">⬅</span>
+          <span class="mobile-text">LEFT</span>
+        </button>
+        <button id="btn-mobile-nitro" class="btn-mobile btn-nitro" aria-label="Nitro Speed Boost">
+          <span class="mobile-arrow" aria-hidden="true">⚡</span>
+          <span class="mobile-text">NITRO</span>
+        </button>
+        <button id="btn-mobile-right" class="btn-mobile" aria-label="Steer Right">
+          <span class="mobile-text">RIGHT</span>
+          <span class="mobile-arrow" aria-hidden="true">➡</span>
+        </button>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
