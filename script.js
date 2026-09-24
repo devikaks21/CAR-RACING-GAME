@@ -131,6 +131,8 @@ const state = {
   highScore: 0,
   coins: 0,
   fuel: 100, // 0 - 100%
+  lives: 3,
+  isInvulnerable: false,
   hasShield: false,
   selectedSkin: 'skin-cyber-blue',
   weather: 'day', // 'day' | 'night' | 'rain'
@@ -185,6 +187,7 @@ const DOM = {
   highScore: document.getElementById('high-score'),
   speed: document.getElementById('speed'),
   coins: document.getElementById('coins'),
+  lives: document.getElementById('lives'),
   fuelBar: document.getElementById('fuel-bar'),
   fuelText: document.getElementById('fuel-text'),
   soundBtn: document.getElementById('btn-sound'),
@@ -369,6 +372,26 @@ function playSound(type) {
       gain.connect(audioCtx.destination);
       osc.start(now);
       osc.stop(now + 0.45);
+    } 
+    else if (type === 'heart') {
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(523.25, now);
+      osc1.frequency.exponentialRampToValueAtTime(1046.50, now + 0.22);
+      osc2.frequency.setValueAtTime(659.25, now);
+      osc2.frequency.exponentialRampToValueAtTime(1318.51, now + 0.22);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.28);
+      osc2.stop(now + 0.28);
     } 
     else if (type === 'out_of_fuel') {
       const osc = audioCtx.createOscillator();
@@ -577,9 +600,26 @@ function resetGame() {
 
   DOM.score.textContent = '0';
   DOM.coins.textContent = '🪙 0';
+  state.lives = 3;
+  state.isInvulnerable = false;
+  updateLivesUI();
   updateFuelUI();
   DOM.speed.textContent = '1x';
   DOM.road.classList.remove('crash-shake');
+  if (DOM.playerCar) DOM.playerCar.classList.remove('invulnerable');
+}
+
+function updateLivesUI() {
+  if (!DOM.lives) return;
+  if (state.lives >= 3) {
+    DOM.lives.textContent = '❤️❤️❤️';
+  } else if (state.lives === 2) {
+    DOM.lives.textContent = '❤️❤️🤍';
+  } else if (state.lives === 1) {
+    DOM.lives.textContent = '❤️🤍🤍';
+  } else {
+    DOM.lives.textContent = '🤍🤍🤍';
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -639,40 +679,36 @@ function createEnemy() {
   const usableWidth = state.roadWidth - (CONFIG.ROAD_BORDER_WIDTH * 2);
   const laneWidth = usableWidth / CONFIG.TOTAL_LANES;
 
-  const availableLanes = [];
-  for (let lane = 0; lane < CONFIG.TOTAL_LANES; lane++) {
-    const isObstructed = state.enemies.some(e => {
-      const isNearbyLane = Math.abs(e.lane - lane) <= 1;
-      const isNearTop = e.y < CONFIG.MIN_VERTICAL_GAP;
-      return isNearbyLane && isNearTop;
-    });
-
-    if (!isObstructed) {
-      availableLanes.push(lane);
+  // Check which lanes currently have traffic near the top spawn area
+  const laneClear = [true, true, true];
+  for (let i = 0; i < state.enemies.length; i++) {
+    const e = state.enemies[i];
+    // If an enemy is within 250px of top, this lane is busy
+    if (e.y < 250 && e.lane >= 0 && e.lane < CONFIG.TOTAL_LANES) {
+      laneClear[e.lane] = false;
     }
   }
 
-  let chosenLane = 0;
-  if (availableLanes.length > 0) {
-    chosenLane = availableLanes[Math.floor(Math.random() * availableLanes.length)];
-  } else {
-    let maxDistance = -Infinity;
-    for (let lane = 0; lane < CONFIG.TOTAL_LANES; lane++) {
-      const topEnemy = state.enemies.filter(e => e.lane === lane).sort((a, b) => a.y - b.y)[0];
-      const dist = topEnemy ? topEnemy.y : 9999;
-      if (dist > maxDistance) {
-        maxDistance = dist;
-        chosenLane = lane;
-      }
-    }
+  const clearLanes = [];
+  for (let l = 0; l < CONFIG.TOTAL_LANES; l++) {
+    if (laneClear[l]) clearLanes.push(l);
   }
+
+  // GUARANTEED SAFE ESCAPE ROUTE:
+  // Never spawn if fewer than 2 lanes are clear.
+  // This guarantees there is ALWAYS at least one fully unobstructed lane for the player!
+  if (clearLanes.length < 2) {
+    return false;
+  }
+
+  const chosenLane = clearLanes[Math.floor(Math.random() * clearLanes.length)];
 
   const laneCenterX = CONFIG.ROAD_BORDER_WIDTH + (laneWidth * chosenLane) + (laneWidth / 2);
   const spawnX = laneCenterX - (state.playerWidth / 2);
-  const spawnY = -state.playerHeight - 10;
+  const spawnY = -state.playerHeight - 12;
 
   const styleObj = CONFIG.ENEMY_STYLES[Math.floor(Math.random() * CONFIG.ENEMY_STYLES.length)];
-  const speedVariation = 0.92 + Math.random() * 0.16;
+  const speedVariation = 0.94 + Math.random() * 0.12;
 
   const enemyEl = document.createElement('div');
   enemyEl.className = 'enemy-car';
@@ -714,12 +750,19 @@ function createEnemy() {
     speedMultiplier: speedVariation,
     passed: false
   });
+
+  return true;
 }
 
 function checkAndSpawnEnemy(timestamp) {
   if (timestamp - state.lastEnemySpawnTime >= state.spawnInterval) {
-    createEnemy();
-    state.lastEnemySpawnTime = timestamp;
+    const spawned = createEnemy();
+    if (spawned) {
+      state.lastEnemySpawnTime = timestamp;
+    } else {
+      // If road was temporarily congested, check again in 300ms
+      state.lastEnemySpawnTime = timestamp - state.spawnInterval + 300;
+    }
   }
 }
 
@@ -770,15 +813,18 @@ function checkAndSpawnPickup(timestamp) {
   let type = 'coin';
   let innerHtml = '<div class="pickup-inner">🪙</div>';
 
-  if (rand < 0.62) {
+  if (rand < 0.52) {
     type = 'coin';
     innerHtml = '<div class="pickup-inner">🪙</div>';
-  } else if (rand < 0.88) {
+  } else if (rand < 0.74) {
     type = 'fuel';
     innerHtml = '<div class="pickup-inner">⛽</div>';
-  } else {
+  } else if (rand < 0.88) {
     type = 'shield';
     innerHtml = '<div class="pickup-inner">🛡️</div>';
+  } else {
+    type = 'heart';
+    innerHtml = '<div class="pickup-inner">❤️</div>';
   }
 
   const el = document.createElement('div');
@@ -857,6 +903,12 @@ function checkPickupCollision() {
         playSound('shield_on');
         createFloatingText('🛡️ SHIELD ACTIVE!', item.x, item.y, 'float-shield');
       }
+      else if (item.type === 'heart') {
+        state.lives = Math.min(3, state.lives + 1);
+        updateLivesUI();
+        playSound('heart');
+        createFloatingText('❤️ +1 LIFE REPAIRED!', item.x, item.y, 'float-heart');
+      }
 
       if (item.el && item.el.parentNode) {
         item.el.parentNode.removeChild(item.el);
@@ -918,6 +970,12 @@ function checkCollision() {
     );
 
     if (isColliding) {
+      // 1. If currently invulnerable from recent hit, ignore collision
+      if (state.isInvulnerable) {
+        continue;
+      }
+
+      // 2. If Shield is active, absorb crash completely
       if (state.hasShield) {
         state.hasShield = false;
         if (DOM.playerShield) DOM.playerShield.style.display = 'none';
@@ -926,7 +984,7 @@ function checkCollision() {
         updateScore(100);
         createFloatingText('🛡️ CRASH DEFLECTED! +100', enemy.x, enemy.y, 'float-deflect');
 
-        // Immediately remove enemy from state so it cannot re-collide in next animation frame
+        // Immediately remove enemy from state so it cannot re-collide
         const deflectedEl = enemy.el;
         state.enemies.splice(i, 1);
 
@@ -942,6 +1000,36 @@ function checkCollision() {
         return false;
       }
 
+      // 3. Multi-life damage reduction (keeps game going)
+      if (state.lives > 1) {
+        state.lives -= 1;
+        updateLivesUI();
+        playSound('crash');
+        DOM.road.classList.add('crash-shake');
+        setTimeout(() => DOM.road.classList.remove('crash-shake'), 400);
+
+        const crashedEl = enemy.el;
+        state.enemies.splice(i, 1);
+        if (crashedEl && crashedEl.parentNode) {
+          crashedEl.parentNode.removeChild(crashedEl);
+        }
+
+        createFloatingText(`💥 -1 LIFE! (${state.lives} LEFT)`, state.playerX, state.playerY - 20, 'float-crash');
+
+        // Grant 2 seconds of flashing invulnerability
+        state.isInvulnerable = true;
+        DOM.playerCar.classList.add('invulnerable');
+        setTimeout(() => {
+          state.isInvulnerable = false;
+          if (DOM.playerCar) DOM.playerCar.classList.remove('invulnerable');
+        }, 2000);
+
+        return false;
+      }
+
+      // 4. Fatal collision (0 lives left)
+      state.lives = 0;
+      updateLivesUI();
       return true;
     }
   }
@@ -1394,6 +1482,50 @@ function setupInputListeners() {
   if (DOM.qrCloseBtn) DOM.qrCloseBtn.addEventListener('click', closeQRModal);
   if (DOM.btnCopyUrl) DOM.btnCopyUrl.addEventListener('click', copyGameURL);
 
+  // Prevent focused buttons from triggering on Spacebar
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.blur();
+    });
+  });
+
+  // Direct Road Touch Steering for Mobile
+  if (DOM.road) {
+    let roadTouching = false;
+    const handleRoadTouch = (e) => {
+      if (state.current !== GameState.PLAYING) return;
+      if (e.target && e.target.closest && e.target.closest('button')) return;
+      
+      const touch = e.touches ? e.touches[0] : e;
+      const roadRect = DOM.road.getBoundingClientRect();
+      const relativeX = touch.clientX - roadRect.left;
+      
+      initAudio();
+      roadTouching = true;
+      if (relativeX < roadRect.width * 0.45) {
+        state.keys.left = true;
+        state.keys.right = false;
+      } else if (relativeX > roadRect.width * 0.55) {
+        state.keys.right = true;
+        state.keys.left = false;
+      } else {
+        state.keys.left = false;
+        state.keys.right = false;
+      }
+    };
+
+    DOM.road.addEventListener('touchstart', handleRoadTouch, { passive: true });
+    DOM.road.addEventListener('touchmove', handleRoadTouch, { passive: true });
+    const endRoadTouch = () => {
+      if (!roadTouching) return;
+      roadTouching = false;
+      state.keys.left = false;
+      state.keys.right = false;
+    };
+    DOM.road.addEventListener('touchend', endRoadTouch);
+    DOM.road.addEventListener('touchcancel', endRoadTouch);
+  }
+
   window.addEventListener('resize', () => {
     updateRoadDimensions();
     const minX = CONFIG.ROAD_BORDER_WIDTH + 2;
@@ -1425,6 +1557,7 @@ function init() {
   initLeaderboard();
   initGarage();
   updateRoadDimensions();
+  updateLivesUI();
 
   state.playerX = (state.roadWidth - state.playerWidth) / 2;
   state.playerY = state.roadHeight - state.playerHeight - 20;
