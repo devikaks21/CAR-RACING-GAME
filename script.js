@@ -52,6 +52,13 @@ const CONFIG = {
     { maxScore: Infinity, multiplier: 2.5, label: '2.5x' }
   ],
 
+  // Speed Gears (Cruise, Sport, Hyper)
+  SPEED_GEARS: [
+    { id: 'cruise', name: 'CRUISE 🟢', speedMul: 0.82, baseMph: 90,  class: 'gear-cruise' },
+    { id: 'sport',  name: 'SPORT ⚡',  speedMul: 1.15, baseMph: 140, class: 'gear-sport' },
+    { id: 'hyper',  name: 'HYPER 🔥',  speedMul: 1.62, baseMph: 210, class: 'gear-hyper' }
+  ],
+
   // Garage Vehicles
   CARS: [
     {
@@ -139,6 +146,8 @@ const state = {
 
   speedMultiplier: 1.0,
   speedLabel: '1x',
+  gearIndex: 1, // 0: Cruise, 1: Sport, 2: Hyper
+  currentMph: 140,
   
   // Player position & movement
   playerX: 0,
@@ -147,10 +156,11 @@ const state = {
   playerHeight: 84,
   steeringDirection: 0,
 
-  // Road animation
+  // Road & Subway Surfers Scenery animation
   roadOffset: 0,
   roadWidth: 380,
   roadHeight: 580,
+  sceneryItems: [],
 
   // Active entities
   enemies: [],
@@ -186,6 +196,7 @@ const DOM = {
   score: document.getElementById('score'),
   highScore: document.getElementById('high-score'),
   speed: document.getElementById('speed'),
+  btnGear: document.getElementById('btn-gear'),
   coins: document.getElementById('coins'),
   lives: document.getElementById('lives'),
   fuelBar: document.getElementById('fuel-bar'),
@@ -201,6 +212,15 @@ const DOM = {
   btnWeather: document.getElementById('btn-weather'),
   weatherIcon: document.getElementById('weather-icon'),
   btnLeaderboard: document.getElementById('btn-leaderboard'),
+
+  // Subway Surfers World & Scenery Elements
+  gameWorld: document.getElementById('game-world'),
+  distantSkyline: document.getElementById('distant-skyline'),
+  skylineClouds: document.querySelector('.skyline-clouds'),
+  skylineCity: document.querySelector('.skyline-city'),
+  sceneryLeft: document.getElementById('scenery-left'),
+  sceneryRight: document.getElementById('scenery-right'),
+  speedWarpLines: document.getElementById('speed-warp-lines'),
 
   // Game Area & Overlays
   road: document.getElementById('road'),
@@ -456,6 +476,19 @@ function playSound(type) {
       osc.start(now);
       osc.stop(now + 0.2);
     }
+    else if (type === 'gear_shift') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(480, now + 0.08);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
   } catch (err) {
     console.warn('Audio playback error:', err);
   }
@@ -514,15 +547,20 @@ function gameLoop(timestamp) {
     // 8. Increase Difficulty
     increaseDifficulty();
 
-    // 9. Update Road Animation
-    updateRoadAnimation(dt);
+    // 9. Update Road, Subway Surfers Scenery & Skyline Animation
+    const roadScrollSpeed = updateRoadAnimation(dt);
+    updateScenery(dt, roadScrollSpeed);
+    updateSkylineParallax(dt, roadScrollSpeed, timestamp);
 
-    // 10. Update Rain particle weather & dynamic lightning
+    // 10. Update Digital Speedometer (MPH) & High-Speed Warp Streaks
+    updateSpeedAndMph(dt);
+
+    // 11. Update Rain particle weather & dynamic lightning
     if (state.weather === 'rain') {
       renderRain(timestamp);
     }
 
-    // 11. Render Game
+    // 12. Render Game
     renderGame();
   } catch (err) {
     console.warn('Game loop resilient recovery:', err);
@@ -638,7 +676,13 @@ function resetGame() {
   state.isInvulnerable = false;
   updateLivesUI();
   updateFuelUI();
-  DOM.speed.textContent = '1x';
+  
+  setSpeedGear(1, false);
+  state.currentMph = 140;
+  if (DOM.speed) DOM.speed.textContent = '140';
+  if (DOM.speedWarpLines) DOM.speedWarpLines.classList.remove('active');
+  initScenery();
+
   DOM.road.classList.remove('crash-shake');
   if (DOM.playerCar) DOM.playerCar.classList.remove('invulnerable');
 }
@@ -801,8 +845,7 @@ function checkAndSpawnEnemy(timestamp) {
 }
 
 function moveEnemies(dt) {
-  const nitroBonus = state.keys.nitro ? CONFIG.NITRO_MULTIPLIER : 1.0;
-  const currentSpeed = CONFIG.BASE_ENEMY_SPEED * state.speedMultiplier * nitroBonus;
+  const currentSpeed = getEffectiveEnemySpeed();
 
   for (let i = state.enemies.length - 1; i >= 0; i--) {
     const enemy = state.enemies[i];
@@ -881,8 +924,7 @@ function checkAndSpawnPickup(timestamp) {
 }
 
 function movePickups(dt) {
-  const nitroBonus = state.keys.nitro ? CONFIG.NITRO_MULTIPLIER : 1.0;
-  const roadScrollSpeed = CONFIG.BASE_ROAD_SPEED * state.speedMultiplier * nitroBonus;
+  const roadScrollSpeed = getEffectiveRoadSpeed();
 
   for (let i = state.pickups.length - 1; i >= 0; i--) {
     const p = state.pickups[i];
@@ -1105,7 +1147,6 @@ function increaseDifficulty() {
   if (state.speedMultiplier !== matchedTier.multiplier) {
     state.speedMultiplier = matchedTier.multiplier;
     state.speedLabel = matchedTier.label;
-    DOM.speed.textContent = state.speedLabel;
 
     state.spawnInterval = Math.max(
       CONFIG.MIN_SPAWN_INTERVAL,
@@ -1165,10 +1206,215 @@ function gameOver(reason = 'crash') {
 // ----------------------------------------------------------------------------
 // 13. ROAD RENDERING & WEATHER ENGINE
 // ----------------------------------------------------------------------------
-function updateRoadAnimation(dt) {
+function getEffectiveRoadSpeed() {
   const nitroBonus = state.keys.nitro ? CONFIG.NITRO_MULTIPLIER : 1.0;
-  const roadScrollSpeed = CONFIG.BASE_ROAD_SPEED * state.speedMultiplier * nitroBonus;
+  const gear = CONFIG.SPEED_GEARS[state.gearIndex] || CONFIG.SPEED_GEARS[1];
+  return CONFIG.BASE_ROAD_SPEED * state.speedMultiplier * gear.speedMul * nitroBonus;
+}
+
+function getEffectiveEnemySpeed() {
+  const nitroBonus = state.keys.nitro ? CONFIG.NITRO_MULTIPLIER : 1.0;
+  const gear = CONFIG.SPEED_GEARS[state.gearIndex] || CONFIG.SPEED_GEARS[1];
+  return CONFIG.BASE_ENEMY_SPEED * state.speedMultiplier * gear.speedMul * nitroBonus;
+}
+
+function updateRoadAnimation(dt) {
+  const roadScrollSpeed = getEffectiveRoadSpeed();
   state.roadOffset = (state.roadOffset + roadScrollSpeed * dt) % 72;
+  return roadScrollSpeed;
+}
+
+// ----------------------------------------------------------------------------
+// SUBWAY SURFERS SCENERY SYSTEM (HOUSES, TREES, BUILDINGS, BILLBOARDS)
+// ----------------------------------------------------------------------------
+const SCENERY_TYPES = {
+  left: ['tree', 'house', 'tree', 'streetlight', 'house', 'billboard', 'tree'],
+  right: ['building', 'tree', 'building', 'billboard', 'streetlight', 'building', 'tree']
+};
+
+const BILLBOARD_TEXTS = ['SUBWAY', 'SPEED 99', 'TURBO', 'CYBER CITY', 'SURFERS', 'HYPER', 'APEX RACE'];
+const BUILDING_SIGNS = ['METRO', 'HOTEL', 'PLAZA', 'CYBER', 'SURF', 'APEX', 'TOWER'];
+
+function createSceneryElement(type, side) {
+  const item = document.createElement('div');
+  item.className = `scenery-item scenery-${type}`;
+  
+  if (type === 'tree') {
+    item.innerHTML = `
+      <div class="tree-foliage tier-3"></div>
+      <div class="tree-foliage tier-2"></div>
+      <div class="tree-foliage tier-1"></div>
+      <div class="tree-trunk"></div>
+    `;
+  } else if (type === 'house') {
+    const lit1 = Math.random() > 0.4 ? 'lit' : '';
+    const lit2 = Math.random() > 0.4 ? 'lit' : '';
+    item.innerHTML = `
+      <div class="house-roof"><div class="house-chimney"></div></div>
+      <div class="house-body">
+        <div class="house-windows">
+          <div class="win ${lit1}"></div>
+          <div class="win ${lit2}"></div>
+        </div>
+        <div class="house-door"></div>
+      </div>
+    `;
+  } else if (type === 'building') {
+    const signText = BUILDING_SIGNS[Math.floor(Math.random() * BUILDING_SIGNS.length)];
+    const w1 = Math.random() > 0.35 ? 'lit' : '';
+    const w2 = Math.random() > 0.35 ? 'lit' : '';
+    const w3 = Math.random() > 0.35 ? 'lit' : '';
+    const w4 = Math.random() > 0.35 ? 'lit' : '';
+    const w5 = Math.random() > 0.35 ? 'lit' : '';
+    const w6 = Math.random() > 0.35 ? 'lit' : '';
+    item.innerHTML = `
+      <div class="building-roof"><div class="building-antenna"></div></div>
+      <div class="building-body">
+        <div class="building-neon-sign">${signText}</div>
+        <div class="building-grid">
+          <div class="b-win ${w1}"></div>
+          <div class="b-win ${w2}"></div>
+          <div class="b-win ${w3}"></div>
+          <div class="b-win ${w4}"></div>
+          <div class="b-win ${w5}"></div>
+          <div class="b-win ${w6}"></div>
+        </div>
+      </div>
+    `;
+  } else if (type === 'streetlight') {
+    item.innerHTML = `
+      <div class="lamp-head"></div>
+      <div class="lamp-post"></div>
+    `;
+  } else if (type === 'billboard') {
+    const text = BILLBOARD_TEXTS[Math.floor(Math.random() * BILLBOARD_TEXTS.length)];
+    item.innerHTML = `
+      <div class="billboard-board">${text}</div>
+      <div class="billboard-legs">
+        <div class="billboard-leg"></div>
+        <div class="billboard-leg"></div>
+      </div>
+    `;
+  }
+
+  return item;
+}
+
+function spawnSceneryItem(side, yPos) {
+  const container = side === 'left' ? DOM.sceneryLeft : DOM.sceneryRight;
+  if (!container) return;
+
+  const pool = SCENERY_TYPES[side];
+  const type = pool[Math.floor(Math.random() * pool.length)];
+  const el = createSceneryElement(type, side);
+  el.style.top = `${yPos}px`;
+  container.appendChild(el);
+
+  state.sceneryItems.push({
+    el: el,
+    side: side,
+    type: type,
+    y: yPos
+  });
+}
+
+function initScenery() {
+  if (DOM.sceneryLeft) DOM.sceneryLeft.innerHTML = '';
+  if (DOM.sceneryRight) DOM.sceneryRight.innerHTML = '';
+  state.sceneryItems = [];
+
+  const h = state.roadHeight || 580;
+  // Prepopulate left wing (suburban houses & trees)
+  let y = -80;
+  while (y < h + 100) {
+    spawnSceneryItem('left', y);
+    y += 95 + Math.floor(Math.random() * 35);
+  }
+
+  // Prepopulate right wing (city buildings & billboards)
+  y = -90;
+  while (y < h + 100) {
+    spawnSceneryItem('right', y);
+    y += 105 + Math.floor(Math.random() * 40);
+  }
+}
+
+function updateScenery(dt, roadScrollSpeed) {
+  let minLeftY = Infinity;
+  let minRightY = Infinity;
+
+  for (let i = state.sceneryItems.length - 1; i >= 0; i--) {
+    const item = state.sceneryItems[i];
+    item.y += roadScrollSpeed * dt;
+    item.el.style.top = `${item.y}px`;
+
+    if (item.side === 'left' && item.y < minLeftY) minLeftY = item.y;
+    if (item.side === 'right' && item.y < minRightY) minRightY = item.y;
+
+    // Remove if scrolled below screen
+    if (item.y > state.roadHeight + 110) {
+      if (item.el && item.el.parentNode) {
+        item.el.parentNode.removeChild(item.el);
+      }
+      state.sceneryItems.splice(i, 1);
+    }
+  }
+
+  // Spawn new items at top if needed
+  if (minLeftY === Infinity || minLeftY > -30) {
+    const spawnY = (minLeftY === Infinity ? -40 : minLeftY) - (95 + Math.random() * 35);
+    spawnSceneryItem('left', spawnY);
+  }
+  if (minRightY === Infinity || minRightY > -30) {
+    const spawnY = (minRightY === Infinity ? -40 : minRightY) - (105 + Math.random() * 40);
+    spawnSceneryItem('right', spawnY);
+  }
+}
+
+function updateSkylineParallax(dt, roadScrollSpeed, timestamp) {
+  if (DOM.skylineClouds) {
+    const cloudOffset = (timestamp * 0.015) % 1000;
+    DOM.skylineClouds.style.backgroundPosition = `${cloudOffset}px 0`;
+  }
+  if (DOM.skylineCity) {
+    const cityOffset = (timestamp * 0.006) % 1000;
+    DOM.skylineCity.style.backgroundPosition = `${cityOffset}px 0`;
+  }
+}
+
+function updateSpeedAndMph(dt) {
+  const gear = CONFIG.SPEED_GEARS[state.gearIndex] || CONFIG.SPEED_GEARS[1];
+  const nitroBonus = state.keys.nitro ? 1.34 : 1.0;
+  const targetMph = gear.baseMph * state.speedMultiplier * nitroBonus + (Math.random() * 2 - 1);
+  state.currentMph += (targetMph - state.currentMph) * Math.min(1.0, dt * 6);
+
+  if (DOM.speed) {
+    DOM.speed.textContent = Math.round(state.currentMph);
+  }
+
+  const isHighSpeed = state.keys.nitro || gear.id === 'hyper' || state.currentMph >= 180;
+  if (DOM.speedWarpLines) {
+    DOM.speedWarpLines.classList.toggle('active', isHighSpeed);
+  }
+}
+
+function setSpeedGear(index, notify = true) {
+  state.gearIndex = (index + CONFIG.SPEED_GEARS.length) % CONFIG.SPEED_GEARS.length;
+  const gear = CONFIG.SPEED_GEARS[state.gearIndex];
+
+  if (DOM.btnGear) {
+    DOM.btnGear.className = `gear-badge ${gear.class}`;
+    DOM.btnGear.textContent = gear.name;
+  }
+
+  if (notify) {
+    playSound('gear_shift');
+    createFloatingText(`⚙️ ${gear.name}`, state.playerX, state.playerY - 25, 'float-gear');
+  }
+}
+
+function cycleSpeedGear() {
+  setSpeedGear(state.gearIndex + 1, true);
 }
 
 function renderGame() {
@@ -1185,12 +1431,6 @@ function renderGame() {
   if (state.steeringDirection > 0) carClasses += ' tilt-right';
   if (state.keys.nitro) carClasses += ' nitro-active';
   DOM.playerCar.className = carClasses;
-
-  if (state.keys.nitro) {
-    DOM.speed.textContent = `${state.speedLabel} ⚡`;
-  } else {
-    DOM.speed.textContent = state.speedLabel;
-  }
 
   for (let i = 0; i < state.enemies.length; i++) {
     const enemy = state.enemies[i];
@@ -1313,9 +1553,22 @@ function cycleWeather() {
 function setWeather(mode, notify = true) {
   state.weather = mode;
 
-  // 1. Update road classes
+  // 1. Update road & Subway Surfers scenery classes
   DOM.road.classList.remove('weather-day', 'weather-night', 'weather-rain');
   DOM.road.classList.add(`weather-${mode}`);
+
+  if (DOM.sceneryLeft) {
+    DOM.sceneryLeft.classList.remove('weather-day', 'weather-night', 'weather-rain');
+    DOM.sceneryLeft.classList.add(`weather-${mode}`);
+  }
+  if (DOM.sceneryRight) {
+    DOM.sceneryRight.classList.remove('weather-day', 'weather-night', 'weather-rain');
+    DOM.sceneryRight.classList.add(`weather-${mode}`);
+  }
+  if (DOM.distantSkyline) {
+    DOM.distantSkyline.classList.remove('weather-day', 'weather-night', 'weather-rain');
+    DOM.distantSkyline.classList.add(`weather-${mode}`);
+  }
 
   // 2. Update body theme classes
   document.body.classList.remove('weather-day-active', 'weather-night-active', 'weather-rain-active');
@@ -1534,6 +1787,10 @@ function setupInputListeners() {
     if (e.code === 'KeyC') {
       cycleWeather();
     }
+
+    if (e.code === 'KeyG') {
+      cycleSpeedGear();
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -1580,6 +1837,14 @@ function setupInputListeners() {
     else if (state.current === GameState.PAUSED) resumeGame();
   });
   DOM.btnRestart.addEventListener('click', restartGame);
+
+  // Speed Gear Shifter Button
+  if (DOM.btnGear) {
+    DOM.btnGear.addEventListener('click', () => {
+      DOM.btnGear.blur();
+      cycleSpeedGear();
+    });
+  }
 
   // New Upgrade Buttons
   if (DOM.btnGarage) DOM.btnGarage.addEventListener('click', openGarageModal);
@@ -1692,6 +1957,8 @@ function init() {
   initGarage();
   updateRoadDimensions();
   updateLivesUI();
+  setSpeedGear(1, false);
+  initScenery();
 
   const savedWeather = localStorage.getItem('racing_weather_pref') || 'day';
   setWeather(savedWeather, false);
