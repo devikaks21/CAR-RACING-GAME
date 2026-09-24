@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>🚗 Car Racing Game</title>
-  <link rel="stylesheet" href="style.css?v=20260924_04">
+  <link rel="stylesheet" href="style.css?v=20260924_05">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -37,6 +37,22 @@
           </button>
         </div>
       </div>
+
+      <!-- On-Demand Weather Environment Selector -->
+      <nav class="weather-toolbar" aria-label="Select Weather Mode">
+        <button class="weather-pill active" data-weather="day" aria-label="Daylight Mode" title="☀️ Daylight Horizon">
+          <span class="weather-pill-icon">☀️</span>
+          <span class="weather-pill-label">DAY</span>
+        </button>
+        <button class="weather-pill" data-weather="night" aria-label="Neon Night Mode" title="🌙 Cyber Neon Night">
+          <span class="weather-pill-icon">🌙</span>
+          <span class="weather-pill-label">NEON NIGHT</span>
+        </button>
+        <button class="weather-pill" data-weather="rain" aria-label="Rainstorm Mode" title="🌧️ Heavy Thunderstorm">
+          <span class="weather-pill-icon">🌧️</span>
+          <span class="weather-pill-label">RAINSTORM</span>
+        </button>
+      </nav>
 
       <!-- Heads-Up Display (HUD) -->
       <section class="hud-panel" aria-label="Game HUD">
@@ -82,6 +98,11 @@
         <div id="road" class="racing-road weather-day">
           <!-- Ambient Weather Rain Canvas -->
           <canvas id="rain-canvas" class="rain-canvas" aria-hidden="true"></canvas>
+
+          <!-- Weather Atmospheric Overlays -->
+          <div class="sun-glare-overlay" aria-hidden="true"></div>
+          <div class="night-fog-overlay" aria-hidden="true"></div>
+          <div class="lightning-flash-overlay" aria-hidden="true"></div>
 
           <!-- Road Curbs (Borders) -->
           <div class="road-border road-border-left" aria-hidden="true"></div>
@@ -329,6 +350,6 @@
     </main>
   </div>
 
-  <script src="script.js?v=20260924_04"></script>
+  <script src="script.js?v=20260924_05"></script>
 </body>
 </html>
