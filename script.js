@@ -40,9 +40,9 @@ const CONFIG = {
   BASE_PICKUP_INTERVAL: 2400,
   MIN_PICKUP_INTERVAL: 1400,
 
-  // Fuel depletion rate (% per second)
-  BASE_FUEL_BURN_RATE: 4.2,
-  NITRO_FUEL_BURN_RATE: 7.5,
+  // Fuel depletion rate (% per second - balanced for 2-3 minute continuous racing per tank)
+  BASE_FUEL_BURN_RATE: 0.7,
+  NITRO_FUEL_BURN_RATE: 1.5,
 
   // Score intervals for speed scaling
   SPEED_TIERS: [
@@ -421,58 +421,60 @@ function gameLoop(timestamp) {
     return;
   }
 
-  if (!state.lastFrameTime) state.lastFrameTime = timestamp;
-  const rawDelta = (timestamp - state.lastFrameTime) / 1000;
-  const dt = Math.min(rawDelta, 0.05);
-  state.lastFrameTime = timestamp;
+  try {
+    if (!state.lastFrameTime) state.lastFrameTime = timestamp;
+    const rawDelta = (timestamp - state.lastFrameTime) / 1000;
+    const dt = Math.min(rawDelta, 0.05);
+    state.lastFrameTime = timestamp;
 
-  // 1. Move Player
-  movePlayer(dt);
+    // 1. Move Player
+    movePlayer(dt);
 
-  // 2. Consume Fuel
-  updateFuel(dt);
-  if (state.fuel <= 0) {
-    gameOver('fuel');
-    return;
+    // 2. Consume Fuel (gently drains, enters low-fuel mode if 0, never freezes)
+    updateFuel(dt);
+
+    // 3. Spawn & Move Enemy Cars
+    checkAndSpawnEnemy(timestamp);
+    moveEnemies(dt);
+
+    // 4. Spawn & Move Pickups (Coins, Fuel, Shields)
+    checkAndSpawnPickup(timestamp);
+    movePickups(dt);
+
+    // 5. Check Pickups Collision
+    checkPickupCollision();
+
+    // 6. Check Enemy Collisions (with Shield protection check)
+    const isFatalCollision = checkCollision();
+    if (isFatalCollision) {
+      gameOver('crash');
+      return;
+    }
+
+    // 7. Check Passed Enemies & Award Points
+    checkPassedEnemies();
+
+    // 8. Increase Difficulty
+    increaseDifficulty();
+
+    // 9. Update Road Animation
+    updateRoadAnimation(dt);
+
+    // 10. Update Rain particle weather
+    if (state.weather === 'rain') {
+      renderRain();
+    }
+
+    // 11. Render Game
+    renderGame();
+  } catch (err) {
+    console.warn('Game loop resilient recovery:', err);
+  } finally {
+    // ALWAYS request next frame if still in PLAYING state
+    if (state.current === GameState.PLAYING) {
+      state.animationFrameId = requestAnimationFrame(gameLoop);
+    }
   }
-
-  // 3. Spawn & Move Enemy Cars
-  checkAndSpawnEnemy(timestamp);
-  moveEnemies(dt);
-
-  // 4. Spawn & Move Pickups (Coins, Fuel, Shields)
-  checkAndSpawnPickup(timestamp);
-  movePickups(dt);
-
-  // 5. Check Pickups Collision
-  checkPickupCollision();
-
-  // 6. Check Enemy Collisions (with Shield protection check)
-  const isFatalCollision = checkCollision();
-  if (isFatalCollision) {
-    gameOver('crash');
-    return;
-  }
-
-  // 7. Check Passed Enemies & Award Points
-  checkPassedEnemies();
-
-  // 8. Increase Difficulty
-  increaseDifficulty();
-
-  // 9. Update Road Animation
-  updateRoadAnimation(dt);
-
-  // 10. Update Rain particle weather
-  if (state.weather === 'rain') {
-    renderRain();
-  }
-
-  // 11. Render Game
-  renderGame();
-
-  // 12. Request Next Frame
-  state.animationFrameId = requestAnimationFrame(gameLoop);
 }
 
 // ----------------------------------------------------------------------------
@@ -609,17 +611,23 @@ function updateFuel(dt) {
 function updateFuelUI() {
   if (!DOM.fuelBar || !DOM.fuelText) return;
   const pct = Math.round(state.fuel);
-  DOM.fuelText.textContent = `${pct}%`;
   DOM.fuelBar.style.width = `${pct}%`;
 
   DOM.fuelBar.classList.remove('fuel-warning', 'fuel-critical');
-  if (pct < 22) {
+  if (pct <= 0) {
     DOM.fuelBar.classList.add('fuel-critical');
+    DOM.fuelText.textContent = 'LOW ⚠️';
     DOM.fuelText.style.color = '#ff0055';
-  } else if (pct < 45) {
+  } else if (pct < 25) {
+    DOM.fuelBar.classList.add('fuel-critical');
+    DOM.fuelText.textContent = `${pct}%`;
+    DOM.fuelText.style.color = '#ff0055';
+  } else if (pct < 50) {
     DOM.fuelBar.classList.add('fuel-warning');
+    DOM.fuelText.textContent = `${pct}%`;
     DOM.fuelText.style.color = '#ffb703';
   } else {
+    DOM.fuelText.textContent = `${pct}%`;
     DOM.fuelText.style.color = '#00ff88';
   }
 }
@@ -918,19 +926,18 @@ function checkCollision() {
         updateScore(100);
         createFloatingText('🛡️ CRASH DEFLECTED! +100', enemy.x, enemy.y, 'float-deflect');
 
-        enemy.x += (enemy.x > state.playerX ? 150 : -150);
-        enemy.y -= 120;
-        enemy.el.style.transform = 'scale(0) rotate(180deg)';
-        enemy.el.style.opacity = '0';
-        enemy.el.style.transition = 'all 0.3s ease';
+        // Immediately remove enemy from state so it cannot re-collide in next animation frame
+        const deflectedEl = enemy.el;
+        state.enemies.splice(i, 1);
 
-        setTimeout(() => {
-          if (enemy.el && enemy.el.parentNode) {
-            enemy.el.parentNode.removeChild(enemy.el);
-          }
-          const idx = state.enemies.indexOf(enemy);
-          if (idx !== -1) state.enemies.splice(idx, 1);
-        }, 320);
+        if (deflectedEl) {
+          deflectedEl.style.transform = 'scale(0.2) rotate(220deg) translateY(-80px)';
+          deflectedEl.style.opacity = '0';
+          deflectedEl.style.transition = 'all 0.35s ease-out';
+          setTimeout(() => {
+            if (deflectedEl.parentNode) deflectedEl.parentNode.removeChild(deflectedEl);
+          }, 360);
+        }
 
         return false;
       }
