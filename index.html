@@ -17,6 +17,15 @@
       <div class="title-bar">
         <h1 class="game-title"><span class="car-icon" aria-hidden="true">🚗</span> CAR RACING GAME</h1>
         <div class="header-actions">
+          <button id="btn-garage" class="btn-icon" aria-label="Open Garage" title="Customize Car">
+            <span>🏎️</span>
+          </button>
+          <button id="btn-weather" class="btn-icon" aria-label="Change Weather" title="Cycle Weather (Day/Night/Rain)">
+            <span id="weather-icon">☀️</span>
+          </button>
+          <button id="btn-leaderboard" class="btn-icon" aria-label="View Leaderboard" title="High Score Leaderboard">
+            <span>🏆</span>
+          </button>
           <button id="btn-qr" class="btn-icon" aria-label="Scan QR Code to Play on Mobile" title="Scan QR Code">
             <span>📱</span>
           </button>
@@ -33,8 +42,17 @@
           <span id="score" class="hud-value score-pulse">0</span>
         </div>
         <div class="hud-item">
-          <span class="hud-label">High Score</span>
-          <span id="high-score" class="hud-value">0</span>
+          <span class="hud-label">Coins</span>
+          <span id="coins" class="hud-value coin-pulse">🪙 0</span>
+        </div>
+        <div class="hud-item hud-fuel-item">
+          <div class="fuel-header-row">
+            <span class="hud-label">Fuel</span>
+            <span id="fuel-text" class="fuel-text">100%</span>
+          </div>
+          <div class="fuel-track" aria-label="Fuel Gauge">
+            <div id="fuel-bar" class="fuel-bar-fill"></div>
+          </div>
         </div>
         <div class="hud-item">
           <span class="hud-label">Speed</span>
@@ -54,7 +72,10 @@
     <main class="game-main">
       <div id="game-container" class="game-container">
         <!-- Racing Road -->
-        <div id="road" class="racing-road">
+        <div id="road" class="racing-road weather-day">
+          <!-- Ambient Weather Rain Canvas -->
+          <canvas id="rain-canvas" class="rain-canvas" aria-hidden="true"></canvas>
+
           <!-- Road Curbs (Borders) -->
           <div class="road-border road-border-left" aria-hidden="true"></div>
           <div class="road-border road-border-right" aria-hidden="true"></div>
@@ -66,13 +87,32 @@
             <div class="lane-divider lane-divider-2"></div>
           </div>
 
+          <!-- Dynamic Collectibles Container (Coins, Fuel, Shields) -->
+          <div id="pickup-container" class="pickup-container" aria-label="Road Pickups"></div>
+
           <!-- Dynamic Enemy Cars Container -->
           <div id="enemy-container" class="enemy-container" aria-label="Enemy vehicles"></div>
+
+          <!-- Floating Score & Text Popup Container -->
+          <div id="float-text-container" class="float-text-container" aria-hidden="true"></div>
 
           <!-- Player Car -->
           <div id="player-car" class="player-car" aria-label="Player Car" role="img">
             <div class="car-shadow" aria-hidden="true"></div>
-            <div class="car-body player-body" aria-hidden="true">
+            
+            <!-- Forcefield Shield Aura -->
+            <div id="player-shield" class="player-shield-aura" style="display: none;" aria-hidden="true">
+              <div class="shield-ring shield-ring-1"></div>
+              <div class="shield-ring shield-ring-2"></div>
+            </div>
+
+            <div id="player-body" class="car-body player-body skin-cyber-blue" aria-hidden="true">
+              <!-- Police Siren Strobe (Only active on police skin) -->
+              <div id="police-siren" class="police-siren" style="display: none;">
+                <span class="siren-light siren-blue"></span>
+                <span class="siren-light siren-red"></span>
+              </div>
+
               <!-- Headlight beams projecting forward -->
               <div class="headlight-beam beam-left"></div>
               <div class="headlight-beam beam-right"></div>
@@ -112,13 +152,14 @@
               <div class="overlay-icon" aria-hidden="true">🏎️</div>
               <h2 class="overlay-title">CAR RACING GAME</h2>
               <div class="overlay-rules">
-                <p>⚡ Avoid enemy cars on the highway.</p>
-                <p>⏱️ Survive as long as possible.</p>
-                <p>🏆 Pass cars to score +10 & beat your high score!</p>
+                <p>⚡ Dodge traffic & survive the highway!</p>
+                <p>🪙 Grab Coins (+50 pts) & ⛽ Fuel Cans to keep driving!</p>
+                <p>🛡️ Collect Shield Orbs to deflect 1 crash safely!</p>
+                <p>🏎️ Customize your ride in the Garage & climb the Leaderboard!</p>
               </div>
               <div class="overlay-controls-guide">
                 <div class="guide-item">
-                  <span class="key-tag">←</span> <span class="key-tag">→</span> or <span class="key-tag">A</span> <span class="key-tag">D</span>
+                  <span class="key-tag">←</span> <span class="key-tag">→</span> / <span class="key-tag">A</span> <span class="key-tag">D</span>
                   <span class="guide-text">Steer Car</span>
                 </div>
                 <div class="guide-item">
@@ -131,7 +172,10 @@
                 </div>
               </div>
               <button id="start-screen-btn" class="btn btn-primary btn-large" aria-label="Start Game">START GAME</button>
-              <button id="start-qr-btn" class="btn btn-secondary btn-qr-link" aria-label="Open QR Code Scanner">📱 Scan QR to Play on Phone</button>
+              <div class="start-secondary-actions">
+                <button id="start-garage-btn" class="btn btn-secondary" aria-label="Open Garage">🏎️ Garage</button>
+                <button id="start-qr-btn" class="btn btn-secondary btn-qr-link" aria-label="Open QR Code Scanner">📱 Mobile QR</button>
+              </div>
             </div>
           </section>
 
@@ -148,25 +192,89 @@
           <!-- Game Over Screen Overlay -->
           <section id="game-over-screen" class="game-overlay" aria-label="Game Over Screen">
             <div class="overlay-card glass-panel crash-card">
-              <div class="overlay-icon crash-icon" aria-hidden="true">💥</div>
-              <h2 class="overlay-title text-danger">GAME OVER</h2>
+              <div id="game-over-icon" class="overlay-icon crash-icon" aria-hidden="true">💥</div>
+              <h2 id="game-over-title" class="overlay-title text-danger">GAME OVER</h2>
+              <p id="game-over-reason" class="game-over-reason">You crashed into oncoming traffic!</p>
+
               <div class="game-over-stats">
                 <div class="stat-box">
                   <span class="stat-label">Final Score</span>
                   <span id="final-score" class="stat-value">0</span>
                 </div>
                 <div class="stat-box">
+                  <span class="stat-label">Coins Collected</span>
+                  <span id="final-coins" class="stat-value stat-coins">🪙 0</span>
+                </div>
+                <div class="stat-box">
                   <span class="stat-label">High Score</span>
                   <span id="final-high-score" class="stat-value">0</span>
                 </div>
               </div>
+
+              <!-- Leaderboard Save Section -->
+              <div class="leaderboard-save-box">
+                <label for="driver-name-input" class="driver-name-label">Enter Driver Tag for Leaderboard:</label>
+                <div class="driver-input-row">
+                  <input type="text" id="driver-name-input" maxlength="12" placeholder="DRIVER_1" class="driver-input">
+                  <button id="btn-save-score" class="btn btn-secondary btn-save-score">Save</button>
+                </div>
+                <p id="save-score-msg" class="save-score-msg"></p>
+              </div>
+
               <div id="new-record-badge" class="new-record-badge" style="display: none;">
                 🌟 NEW HIGH SCORE! 🌟
               </div>
               <div id="api-sync-status" class="api-sync-badge">
                 ☁️ Cloud API Connected
               </div>
-              <button id="game-over-restart-btn" class="btn btn-primary btn-large" aria-label="Play Again">PLAY AGAIN</button>
+              <div class="game-over-actions">
+                <button id="game-over-restart-btn" class="btn btn-primary btn-large" aria-label="Play Again">PLAY AGAIN</button>
+                <button id="game-over-board-btn" class="btn btn-tertiary" aria-label="View Leaderboard">🏆 High Scores</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Garage Customization Modal -->
+          <section id="garage-modal" class="game-overlay" aria-label="Car Garage">
+            <div class="overlay-card glass-panel garage-card">
+              <button id="garage-close-btn" class="modal-close-btn" aria-label="Close Garage">✕</button>
+              <div class="overlay-icon" aria-hidden="true">🏎️</div>
+              <h2 class="overlay-title">VEHICLE GARAGE</h2>
+              <p class="overlay-subtitle">Choose your high-octane racing machine</p>
+
+              <div class="garage-car-grid" id="garage-car-grid">
+                <!-- Injected via JavaScript -->
+              </div>
+
+              <button id="garage-select-btn" class="btn btn-primary btn-large">EQUIP SELECTED CAR</button>
+            </div>
+          </section>
+
+          <!-- High Score Leaderboard Modal -->
+          <section id="leaderboard-modal" class="game-overlay" aria-label="High Score Leaderboard">
+            <div class="overlay-card glass-panel leaderboard-card">
+              <button id="leaderboard-close-btn" class="modal-close-btn" aria-label="Close Leaderboard">✕</button>
+              <div class="overlay-icon" aria-hidden="true">🏆</div>
+              <h2 class="overlay-title">TOP DRIVERS</h2>
+              <p class="overlay-subtitle">Highway Speed Champions</p>
+
+              <div class="leaderboard-table-wrapper">
+                <table class="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Driver</th>
+                      <th>Car</th>
+                      <th>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody id="leaderboard-tbody">
+                    <!-- Populated via JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+
+              <button id="leaderboard-close-btn-bottom" class="btn btn-secondary">BACK TO RACE</button>
             </div>
           </section>
 
@@ -190,7 +298,7 @@
                 <button id="btn-copy-url" class="btn btn-secondary btn-copy" type="button">📋 Copy</button>
               </div>
               <p id="copy-feedback" class="copy-feedback"></p>
-              <p class="qr-hint">💡 Open this game on your Wi-Fi network or use a tunnel for internet access.</p>
+              <p class="qr-hint">💡 Open this game on your Wi-Fi network or use your live GitHub Pages link.</p>
             </div>
           </section>
         </div>
