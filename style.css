@@ -137,28 +137,41 @@ html, body {
    Heads-Up Display (HUD)
    -------------------------------------------------------------------------- */
 .hud-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
+  padding: 6px 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .hud-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0 2px;
+}
+
+.hud-fuel-item {
+  flex: 1.3;
 }
 
 .hud-item:last-child {
   border-right: none;
+}
+
+.lives-tag {
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  filter: drop-shadow(0 0 6px rgba(255, 30, 80, 0.6));
 }
 
 .hud-label {
@@ -1411,11 +1424,32 @@ html, body {
   text-shadow: 0 0 15px rgba(255, 0, 255, 1);
 }
 
+.float-popup.float-crash {
+  color: #ff0055;
+  font-size: 1.15rem;
+  text-shadow: 0 0 16px rgba(255, 0, 85, 1);
+}
+
+.float-popup.float-heart {
+  color: #ff3366;
+  font-size: 1.1rem;
+  text-shadow: 0 0 14px rgba(255, 51, 102, 0.9);
+}
+
 @keyframes floatUp {
   0% { transform: translate(-50%, 0) scale(0.8); opacity: 0; }
   20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
   80% { transform: translate(-50%, -35px) scale(1); opacity: 0.9; }
   100% { transform: translate(-50%, -50px) scale(0.9); opacity: 0; }
+}
+
+@keyframes playerInvulnerable {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.22; }
+}
+
+.player-car.invulnerable {
+  animation: playerInvulnerable 0.18s infinite !important;
 }
 
 /* --------------------------------------------------------------------------
