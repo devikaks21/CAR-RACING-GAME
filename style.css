@@ -1227,38 +1227,200 @@ html, body {
 }
 
 /* --------------------------------------------------------------------------
-   Weather Modes (Day, Night, Rain)
+   Weather On-Demand Toolbar & Pills
    -------------------------------------------------------------------------- */
+.weather-toolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: var(--road-width);
+  margin-bottom: 8px;
+  padding: 4px 6px;
+  background: rgba(14, 18, 30, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.weather-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+.weather-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.weather-pill.active {
+  color: #fff;
+  font-weight: 800;
+}
+
+.weather-pill[data-weather="day"].active {
+  background: rgba(255, 183, 3, 0.22);
+  border-color: #ffb703;
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 183, 3, 0.45);
+}
+
+.weather-pill[data-weather="night"].active {
+  background: rgba(181, 55, 242, 0.25);
+  border-color: #b537f2;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(181, 55, 242, 0.5);
+}
+
+.weather-pill[data-weather="rain"].active {
+  background: rgba(0, 180, 255, 0.24);
+  border-color: #00b4ff;
+  color: #fff;
+  box-shadow: 0 0 14px rgba(0, 180, 255, 0.45);
+}
+
+.weather-pill-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.weather-pill-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+/* --------------------------------------------------------------------------
+   Atmospheric Weather Modes (Day, Neon Night, Rainstorm)
+   -------------------------------------------------------------------------- */
+
+/* Body dynamic backgrounds */
+body {
+  transition: background 0.6s ease;
+}
+body.weather-day-active {
+  background-color: #091322;
+  background-image: radial-gradient(circle at 50% 15%, #183353 0%, #060e18 85%);
+}
+body.weather-night-active {
+  background-color: #04010a;
+  background-image: radial-gradient(circle at 50% 20%, #1e073a 0%, #030107 85%);
+}
+body.weather-rain-active {
+  background-color: #060d16;
+  background-image: radial-gradient(circle at 50% 15%, #0e2238 0%, #04080e 85%);
+}
+
+/* 1. ☀️ DAY MODE */
 .racing-road.weather-day {
-  filter: brightness(1) contrast(1.02);
+  background-color: #1a1e2b;
+  box-shadow: 0 0 35px rgba(255, 183, 3, 0.15), inset 0 0 25px rgba(0, 0, 0, 0.4);
+  filter: brightness(1.04) contrast(1.05);
 }
 
+.weather-day .sun-glare-overlay {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: radial-gradient(ellipse at 50% -25%, rgba(255, 235, 160, 0.35) 0%, rgba(255, 200, 80, 0.12) 45%, transparent 75%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.weather-day .road-border-left,
+.weather-day .road-border-right {
+  background: repeating-linear-gradient(180deg, #e63946 0px, #e63946 22px, #f1faee 22px, #f1faee 44px);
+  box-shadow: 0 0 10px rgba(230, 57, 70, 0.4);
+}
+
+/* 2. 🌙 NEON NIGHT MODE */
 .racing-road.weather-night {
-  filter: brightness(0.68) contrast(1.25);
-  background-color: #07090e;
+  background-color: #040508;
+  filter: brightness(0.92) contrast(1.28);
+  box-shadow: 0 0 45px rgba(181, 55, 242, 0.25), inset 0 0 50px rgba(0, 0, 0, 0.95);
 }
 
-.racing-road.weather-night .headlight-beam {
-  opacity: 0.85;
-  filter: blur(8px);
-  background: linear-gradient(to top, rgba(255, 255, 200, 0.45), transparent);
+.weather-night .night-fog-overlay {
+  display: block;
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 85%, transparent 25%, rgba(5, 4, 12, 0.55) 70%, rgba(3, 2, 8, 0.82) 100%);
+  pointer-events: none;
+  z-index: 5;
 }
 
-.racing-road.weather-night .road-border {
-  box-shadow: 0 0 18px rgba(0, 240, 255, 0.6);
+.weather-night .road-border-left {
+  background: repeating-linear-gradient(180deg, #ff007f 0px, #ff007f 22px, #111116 22px, #111116 44px);
+  box-shadow: 0 0 16px #ff007f, 0 0 35px rgba(255, 0, 127, 0.55);
 }
 
+.weather-night .road-border-right {
+  background: repeating-linear-gradient(180deg, #00f0ff 0px, #00f0ff 22px, #111116 22px, #111116 44px);
+  box-shadow: 0 0 16px #00f0ff, 0 0 35px rgba(0, 240, 255, 0.55);
+}
+
+.weather-night .lane-divider {
+  opacity: 0.92;
+  filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.75));
+}
+
+.weather-night .headlight-beam {
+  display: block !important;
+  opacity: 0.95;
+  filter: blur(5px);
+  background: linear-gradient(to top, rgba(255, 255, 220, 0.7) 0%, rgba(180, 240, 255, 0.28) 40%, transparent 100%);
+  height: 210px;
+}
+
+/* 3. 🌧️ RAINSTORM & LIGHTNING MODE */
 .racing-road.weather-rain {
-  filter: brightness(0.82) contrast(1.15) saturate(1.2);
+  background-color: #090e17;
+  filter: brightness(0.88) contrast(1.18) saturate(1.25);
+  box-shadow: 0 0 35px rgba(0, 180, 255, 0.2), inset 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
-.racing-road.weather-rain::after {
+.weather-rain::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20, 40, 80, 0.15) 0%, rgba(10, 20, 40, 0.3) 100%);
+  background: linear-gradient(180deg, rgba(8, 22, 45, 0.15) 0%, rgba(4, 12, 28, 0.4) 100%);
   pointer-events: none;
   z-index: 4;
+}
+
+.weather-rain .road-border-left,
+.weather-rain .road-border-right {
+  background: repeating-linear-gradient(180deg, #0077b6 0px, #0077b6 22px, #caf0f8 22px, #caf0f8 44px);
+  box-shadow: 0 0 14px rgba(0, 119, 182, 0.6);
+}
+
+.weather-rain .headlight-beam {
+  display: block !important;
+  opacity: 0.65;
+  filter: blur(7px);
+  background: linear-gradient(to top, rgba(200, 235, 255, 0.45) 0%, transparent 80%);
 }
 
 .rain-canvas {
@@ -1274,6 +1436,71 @@ html, body {
 
 .weather-rain .rain-canvas {
   opacity: 1;
+}
+
+/* Dynamic Lightning Strike Double-Flash */
+.lightning-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.94);
+  pointer-events: none;
+  z-index: 22;
+  opacity: 0;
+}
+
+@keyframes lightningStrobe {
+  0% { opacity: 0; }
+  8% { opacity: 0.95; }
+  18% { opacity: 0.15; }
+  28% { opacity: 0.85; }
+  45% { opacity: 0.1; }
+  100% { opacity: 0; }
+}
+
+.lightning-active .lightning-flash-overlay {
+  animation: lightningStrobe 0.42s ease-out;
+}
+
+/* Floating Weather Announcement Banners */
+.float-popup.float-weather {
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(10, 14, 25, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  letter-spacing: 1.2px;
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.65);
+  animation: floatWeather 1.5s forwards cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  z-index: 28;
+}
+
+.float-weather-day {
+  color: #ffb703;
+  border: 1px solid rgba(255, 183, 3, 0.6);
+  text-shadow: 0 0 12px rgba(255, 183, 3, 0.85);
+}
+
+.float-weather-night {
+  color: #b537f2;
+  border: 1px solid rgba(181, 55, 242, 0.7);
+  text-shadow: 0 0 14px rgba(181, 55, 242, 0.95);
+}
+
+.float-weather-rain {
+  color: #00b4ff;
+  border: 1px solid rgba(0, 180, 255, 0.7);
+  text-shadow: 0 0 14px rgba(0, 180, 255, 0.95);
+}
+
+@keyframes floatWeather {
+  0% { transform: translate(-50%, 15px) scale(0.85); opacity: 0; }
+  15% { transform: translate(-50%, 0) scale(1.06); opacity: 1; }
+  35% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  80% { transform: translate(-50%, -10px) scale(1); opacity: 0.9; }
+  100% { transform: translate(-50%, -28px) scale(0.92); opacity: 0; }
 }
 
 /* --------------------------------------------------------------------------
