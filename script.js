@@ -422,6 +422,40 @@ function playSound(type) {
       osc.start(now);
       osc.stop(now + 0.5);
     }
+    else if (type === 'thunder') {
+      const bufferSize = Math.floor(audioCtx.sampleRate * 1.3);
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.42));
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(150, now);
+      filter.frequency.exponentialRampToValueAtTime(35, now + 1.25);
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 1.25);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(now);
+    }
+    else if (type === 'weather_switch') {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(680, now + 0.16);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    }
   } catch (err) {
     console.warn('Audio playback error:', err);
   }
@@ -483,9 +517,9 @@ function gameLoop(timestamp) {
     // 9. Update Road Animation
     updateRoadAnimation(dt);
 
-    // 10. Update Rain particle weather
+    // 10. Update Rain particle weather & dynamic lightning
     if (state.weather === 'rain') {
-      renderRain();
+      renderRain(timestamp);
     }
 
     // 11. Render Game
@@ -1167,19 +1201,27 @@ function renderGame() {
 
 // Weather Engine
 let rainParticles = [];
+let rainSplashes = [];
+let lastLightningTime = 0;
+let nextLightningInterval = 7000 + Math.random() * 6000;
+
 function initRainParticles() {
   rainParticles = [];
-  for (let i = 0; i < 90; i++) {
+  rainSplashes = [];
+  const w = state.roadWidth || 400;
+  const h = state.roadHeight || 600;
+  for (let i = 0; i < 110; i++) {
     rainParticles.push({
-      x: Math.random() * (state.roadWidth || 400),
-      y: Math.random() * (state.roadHeight || 600),
-      length: 12 + Math.random() * 14,
-      speed: 16 + Math.random() * 12
+      x: Math.random() * w,
+      y: Math.random() * h,
+      length: 14 + Math.random() * 16,
+      speed: 22 + Math.random() * 14,
+      opacity: 0.35 + Math.random() * 0.4
     });
   }
 }
 
-function renderRain() {
+function renderRain(timestamp = performance.now()) {
   if (!DOM.rainCanvas) return;
   const ctx = DOM.rainCanvas.getContext('2d');
   if (!ctx) return;
@@ -1189,50 +1231,129 @@ function renderRain() {
     DOM.rainCanvas.height = state.roadHeight;
   }
 
-  ctx.clearRect(0, 0, DOM.rainCanvas.width, DOM.rainCanvas.height);
-  ctx.strokeStyle = 'rgba(180, 225, 255, 0.45)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
+  const w = DOM.rainCanvas.width;
+  const h = DOM.rainCanvas.height;
 
+  ctx.clearRect(0, 0, w, h);
+
+  // 1. Render Rain Streaks
   for (let i = 0; i < rainParticles.length; i++) {
     const p = rainParticles[i];
+    ctx.strokeStyle = `rgba(180, 230, 255, ${p.opacity})`;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x + 3, p.y + p.length);
+    ctx.lineTo(p.x + 3.5, p.y + p.length);
+    ctx.stroke();
 
     p.y += p.speed;
-    p.x += 1.5;
+    p.x += 1.8;
 
-    if (p.y > state.roadHeight) {
+    if (p.y > h - 10) {
+      if (rainSplashes.length < 35 && Math.random() < 0.4) {
+        rainSplashes.push({
+          x: p.x,
+          y: Math.min(h - 5, p.y),
+          radius: 1.5,
+          maxRadius: 6 + Math.random() * 6,
+          opacity: 0.6
+        });
+      }
       p.y = -p.length;
-      p.x = Math.random() * state.roadWidth;
+      p.x = Math.random() * w;
     }
   }
-  ctx.stroke();
+
+  // 2. Render Splash Ripples
+  for (let s = rainSplashes.length - 1; s >= 0; s--) {
+    const sp = rainSplashes[s];
+    ctx.strokeStyle = `rgba(160, 220, 255, ${sp.opacity})`;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, sp.radius * 1.6, sp.radius * 0.7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    sp.radius += 0.45;
+    sp.opacity -= 0.04;
+
+    if (sp.opacity <= 0 || sp.radius >= sp.maxRadius) {
+      rainSplashes.splice(s, 1);
+    }
+  }
+
+  // 3. Dynamic Thunder & Lightning Flash
+  if (state.current === GameState.PLAYING) {
+    if (!lastLightningTime) lastLightningTime = timestamp;
+    if (timestamp - lastLightningTime > nextLightningInterval) {
+      triggerLightningStrike();
+      lastLightningTime = timestamp;
+      nextLightningInterval = 7000 + Math.random() * 8000;
+    }
+  }
+}
+
+function triggerLightningStrike() {
+  if (!DOM.road || state.weather !== 'rain') return;
+  DOM.road.classList.remove('lightning-active');
+  void DOM.road.offsetWidth;
+  DOM.road.classList.add('lightning-active');
+  playSound('thunder');
+  setTimeout(() => {
+    if (DOM.road) DOM.road.classList.remove('lightning-active');
+  }, 440);
 }
 
 function cycleWeather() {
   const modes = ['day', 'night', 'rain'];
   const currentIndex = modes.indexOf(state.weather);
   const nextMode = modes[(currentIndex + 1) % modes.length];
-  setWeather(nextMode);
+  setWeather(nextMode, true);
 }
 
-function setWeather(mode) {
+function setWeather(mode, notify = true) {
   state.weather = mode;
+
+  // 1. Update road classes
   DOM.road.classList.remove('weather-day', 'weather-night', 'weather-rain');
   DOM.road.classList.add(`weather-${mode}`);
 
+  // 2. Update body theme classes
+  document.body.classList.remove('weather-day-active', 'weather-night-active', 'weather-rain-active');
+  document.body.classList.add(`weather-${mode}-active`);
+
+  // 3. Update active pill buttons
+  document.querySelectorAll('.weather-pill').forEach(pill => {
+    if (pill.dataset.weather === mode) {
+      pill.classList.add('active');
+    } else {
+      pill.classList.remove('active');
+    }
+  });
+
+  // 4. Update Header Icon, Tooltip, and floating banner
   if (mode === 'day') {
     DOM.weatherIcon.textContent = '☀️';
-    DOM.btnWeather.title = 'Current: Daylight (Click for Night)';
+    DOM.btnWeather.title = 'Daylight Horizon (Click for Neon Night)';
+    if (notify) createFloatingText('☀️ DAYLIGHT SUNRISE', state.roadWidth / 2, 70, 'float-weather float-weather-day');
   } else if (mode === 'night') {
     DOM.weatherIcon.textContent = '🌙';
-    DOM.btnWeather.title = 'Current: Neon Night (Click for Rain)';
+    DOM.btnWeather.title = 'Cyber Neon Night (Click for Rainstorm)';
+    if (notify) createFloatingText('🌙 CYBER NEON NIGHT', state.roadWidth / 2, 70, 'float-weather float-weather-night');
   } else if (mode === 'rain') {
     DOM.weatherIcon.textContent = '🌧️';
-    DOM.btnWeather.title = 'Current: Rainstorm (Click for Day)';
+    DOM.btnWeather.title = 'Heavy Thunderstorm (Click for Daylight)';
     initRainParticles();
+    if (notify) {
+      createFloatingText('🌧️ HEAVY THUNDERSTORM', state.roadWidth / 2, 70, 'float-weather float-weather-rain');
+      playSound('thunder');
+    }
   }
+
+  if (notify) playSound('weather_switch');
+
+  try {
+    localStorage.setItem('racing_weather_pref', mode);
+  } catch (e) {}
 }
 
 // ----------------------------------------------------------------------------
@@ -1409,6 +1530,10 @@ function setupInputListeners() {
       if (state.current === GameState.PLAYING) pauseGame();
       else if (state.current === GameState.PAUSED) resumeGame();
     }
+
+    if (e.code === 'KeyC') {
+      cycleWeather();
+    }
   });
 
   window.addEventListener('keyup', (e) => {
@@ -1463,6 +1588,15 @@ function setupInputListeners() {
   if (DOM.garageSelectBtn) DOM.garageSelectBtn.addEventListener('click', closeGarageModal);
 
   if (DOM.btnWeather) DOM.btnWeather.addEventListener('click', cycleWeather);
+
+  // On-Demand Weather Pill Selectors
+  document.querySelectorAll('.weather-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      pill.blur();
+      const mode = pill.dataset.weather;
+      if (mode) setWeather(mode, true);
+    });
+  });
 
   if (DOM.btnLeaderboard) DOM.btnLeaderboard.addEventListener('click', openLeaderboardModal);
   if (DOM.leaderboardCloseBtn) DOM.leaderboardCloseBtn.addEventListener('click', closeLeaderboardModal);
@@ -1558,6 +1692,9 @@ function init() {
   initGarage();
   updateRoadDimensions();
   updateLivesUI();
+
+  const savedWeather = localStorage.getItem('racing_weather_pref') || 'day';
+  setWeather(savedWeather, false);
 
   state.playerX = (state.roadWidth - state.playerWidth) / 2;
   state.playerY = state.roadHeight - state.playerHeight - 20;
