@@ -23,8 +23,9 @@
   --text-muted: #8e9bb4;
   --text-glow: rgba(0, 240, 255, 0.4);
 
-  /* Road & Car Dimensions */
-  --road-width: 380px;
+  /* Road & Scenery Dimensions (Subway Surfers World) */
+  --road-width: 326px;
+  --scenery-width: 77px;
   --road-height: 580px;
   --car-width: 48px;
   --car-height: 84px;
@@ -205,9 +206,70 @@ html, body {
   text-shadow: 0 0 10px rgba(255, 183, 0, 0.4);
 }
 
+.speed-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
 .speed-tag {
-  color: var(--neon-green);
-  text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.speed-unit {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.gear-badge {
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  outline: none;
+  transition: all 0.2s ease;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.gear-badge:hover {
+  transform: scale(1.08);
+}
+
+.gear-cruise {
+  background: rgba(0, 255, 136, 0.18);
+  border-color: #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+.gear-sport {
+  background: rgba(0, 240, 255, 0.2);
+  border-color: #00f0ff;
+  color: #00f0ff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
+}
+
+.gear-hyper {
+  background: rgba(255, 0, 85, 0.25);
+  border-color: #ff0055;
+  color: #ff0055;
+  box-shadow: 0 0 12px rgba(255, 0, 85, 0.6);
+  animation: gearPulse 0.6s infinite alternate;
+}
+
+@keyframes gearPulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
 }
 
 /* --------------------------------------------------------------------------
@@ -301,18 +363,350 @@ html, body {
   align-items: center;
 }
 
+/* --------------------------------------------------------------------------
+   Subway Surfers Game World & Scenery Layout
+   -------------------------------------------------------------------------- */
+.game-world {
+  position: relative;
+  width: 100%;
+  max-width: calc(var(--road-width) + (var(--scenery-width) * 2));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Distant Parallax Skyline Horizon */
+.distant-skyline {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: none;
+  overflow: hidden;
+  background: linear-gradient(180deg, #101c30 0%, #1a2d4c 60%, #25406b 100%);
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.skyline-city {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #0c1424 0px,
+    #0c1424 14px,
+    transparent 14px,
+    transparent 16px,
+    #131f38 16px,
+    #131f38 34px,
+    transparent 34px,
+    transparent 37px,
+    #09101c 37px,
+    #09101c 58px,
+    transparent 58px,
+    transparent 62px
+  );
+  mask-image: linear-gradient(to top, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, black 70%, transparent 100%);
+}
+
+.skyline-clouds {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.18) 0%, transparent 35%),
+              radial-gradient(circle at 65% 40%, rgba(255, 255, 255, 0.14) 0%, transparent 40%),
+              radial-gradient(circle at 85% 60%, rgba(255, 255, 255, 0.16) 0%, transparent 30%);
+}
+
 .game-container {
   position: relative;
-  width: var(--road-width);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
   height: var(--road-height);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.15);
-  border-radius: var(--radius-md);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
   overflow: hidden;
+  background: #090e18;
+}
+
+/* Left & Right Scenery Wings (Flanking Roads) */
+.scenery-wing {
+  position: relative;
+  width: var(--scenery-width, 77px);
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.scenery-left {
+  background: linear-gradient(90deg, #16331e 0%, #204529 60%, #2c5936 100%);
+  border-right: 3px solid #3c7d4a;
+  box-shadow: inset -4px 0 12px rgba(0, 0, 0, 0.6);
+}
+
+.scenery-right {
+  background: linear-gradient(270deg, #1b2334 0%, #253046 60%, #2e3c57 100%);
+  border-left: 3px solid #43557a;
+  box-shadow: inset 4px 0 12px rgba(0, 0, 0, 0.6);
+}
+
+/* Subway Surfers Scenery Elements */
+.scenery-item {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.05s linear;
+}
+
+/* 🌲 1. Trees */
+.scenery-tree {
+  width: 44px;
+  height: 68px;
+}
+.tree-foliage {
+  border-radius: 50% 50% 25% 25%;
+  background: radial-gradient(circle at 40% 30%, #52b788 0%, #2d6a4f 70%, #1b4332 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
+}
+.tree-foliage.tier-3 {
+  width: 24px;
+  height: 22px;
+  margin-bottom: -10px;
+  z-index: 3;
+}
+.tree-foliage.tier-2 {
+  width: 34px;
+  height: 25px;
+  margin-bottom: -11px;
+  z-index: 2;
+  background: radial-gradient(circle at 40% 30%, #40916c 0%, #1b4332 80%);
+}
+.tree-foliage.tier-1 {
+  width: 44px;
+  height: 28px;
+  margin-bottom: -5px;
+  z-index: 1;
+  background: radial-gradient(circle at 40% 30%, #2d6a4f 0%, #081c15 100%);
+}
+.tree-trunk {
+  width: 8px;
+  height: 20px;
+  background: linear-gradient(90deg, #582f0e 0%, #7f4f24 50%, #3e1f06 100%);
+  border-radius: 0 0 3px 3px;
+}
+
+/* 🏡 2. Suburban Houses */
+.scenery-house {
+  width: 58px;
+  height: 64px;
+}
+.house-roof {
+  position: relative;
+  width: 56px;
+  height: 20px;
+  background: linear-gradient(135deg, #e63946 0%, #b51726 100%);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.house-chimney {
+  position: absolute;
+  right: 10px;
+  top: 3px;
+  width: 7px;
+  height: 12px;
+  background: #78350f;
+  border-radius: 1px;
+}
+.house-body {
+  width: 50px;
+  height: 40px;
+  background: linear-gradient(180deg, #f8f9fa 0%, #dee2e6 100%);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 4px;
+}
+.house-windows {
+  display: flex;
+  gap: 8px;
+}
+.house-windows .win {
+  width: 10px;
+  height: 10px;
+  background: #38bdf8;
+  border: 1px solid #0369a1;
+  border-radius: 1px;
+}
+.house-windows .win.lit {
+  background: #fef08a;
+  border-color: #ca8a04;
+  box-shadow: 0 0 8px rgba(254, 240, 138, 0.85);
+}
+.house-door {
+  width: 10px;
+  height: 16px;
+  background: #92400e;
+  border-radius: 2px 2px 0 0;
+}
+
+/* 🏢 3. City Buildings & High-Rises */
+.scenery-building {
+  width: 56px;
+  height: 78px;
+}
+.building-roof {
+  width: 52px;
+  height: 8px;
+  background: #334155;
+  border-radius: 2px 2px 0 0;
+  display: flex;
+  justify-content: center;
+}
+.building-antenna {
+  width: 2px;
+  height: 10px;
+  margin-top: -10px;
+  background: #cbd5e1;
+  box-shadow: 0 0 4px #ff0055;
+}
+.building-body {
+  width: 56px;
+  height: 70px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 4px;
+}
+.building-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 10px);
+  gap: 5px;
+}
+.building-grid .b-win {
+  width: 10px;
+  height: 10px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+}
+.building-grid .b-win.lit {
+  background: #fde047;
+  box-shadow: 0 0 7px rgba(253, 224, 71, 0.8);
+}
+.building-neon-sign {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #00f0ff;
+  text-shadow: 0 0 8px #00f0ff;
+}
+
+/* 🏮 4. Streetlights */
+.scenery-streetlight {
+  width: 24px;
+  height: 52px;
+}
+.lamp-post {
+  width: 4px;
+  height: 44px;
+  background: #334155;
+  border-radius: 2px;
+}
+.lamp-head {
+  width: 14px;
+  height: 8px;
+  background: #475569;
+  border-radius: 4px 4px 1px 1px;
+  box-shadow: 0 0 8px #fde047;
+}
+
+/* 🪧 5. Subway Surfers Highway Billboards */
+.scenery-billboard {
+  width: 60px;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.billboard-board {
+  width: 60px;
+  height: 34px;
+  background: linear-gradient(135deg, #f72585 0%, #7209b7 100%);
+  border: 2px solid #fff;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  padding: 2px;
+}
+.billboard-legs {
+  display: flex;
+  gap: 22px;
+}
+.billboard-leg {
+  width: 3px;
+  height: 18px;
+  background: #475569;
+}
+
+/* Speed Warp Lines Effect */
+.speed-warp-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.45) 0px,
+    rgba(255, 255, 255, 0.45) 30px,
+    transparent 30px,
+    transparent 110px
+  );
+  background-size: 100% 140px;
+  animation: warpStreaks 0.16s linear infinite;
+}
+
+.speed-warp-lines.active {
+  opacity: 0.75;
+}
+
+@keyframes warpStreaks {
+  0% { background-position-y: 0px; }
+  100% { background-position-y: 140px; }
 }
 
 .racing-road {
   position: relative;
-  width: 100%;
+  flex: 1;
+  max-width: var(--road-width);
   height: 100%;
   background-color: var(--asphalt-color);
   background-image: url('assets/road.png');
@@ -320,7 +714,7 @@ html, body {
   background-size: 100% auto;
   background-position: 0 0;
   overflow: hidden;
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.8);
 }
 
 /* Crash Screen Shake */
