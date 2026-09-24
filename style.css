@@ -1123,23 +1123,28 @@ html, body {
 }
 
 .overlay-controls-guide {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 10px;
+  margin-bottom: 16px;
   background: rgba(0, 240, 255, 0.05);
   border: 1px dashed rgba(0, 240, 255, 0.3);
   border-radius: var(--radius-sm);
-  padding: 10px;
+  padding: 8px 10px;
 }
 
 .guide-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.82rem;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 0.78rem;
   color: #a0aec0;
+}
+
+.guide-item.guide-full-width {
+  grid-column: span 2;
+  justify-content: center;
 }
 
 .key-tag {
@@ -1147,10 +1152,11 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
   color: #fff;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
 }
 
 /* Game Over Stats */
